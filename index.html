@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinSignal — Pattern Recognition for Financial Time Series</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #040810;
+      --surface: #080f1e;
+      --card: #0c1628;
+      --border: #1a2e50;
+      --accent: #00e5ff;
+      --accent2: #ff6b35;
+      --accent3: #7fff6f;
+      --text: #e8f4f8;
+      --muted: #6a8aaa;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 9999; opacity: 0.4;
+    }
+
+    /* ── GRID BG ── */
+    .grid-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      opacity: 0.3;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.2rem 3rem;
+      background: rgba(4, 8, 16, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-family: var(--font-head);
+      font-size: 1.4rem; font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .nav-logo span { color: var(--accent2); }
+    .nav-links { display: flex; gap: 2rem; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none;
+      font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 8rem 3rem 4rem;
+      overflow: hidden;
+    }
+    .hero-tag {
+      font-size: 0.7rem; letter-spacing: 4px; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--accent);
+      padding: 0.3rem 0.8rem; display: inline-block; margin-bottom: 2rem;
+      animation: fadeUp 0.6s ease both;
+    }
+    .hero h1 {
+      font-family: var(--font-head);
+      font-size: clamp(2.8rem, 7vw, 6rem);
+      font-weight: 800; line-height: 1.0;
+      letter-spacing: -2px;
+      max-width: 900px;
+      animation: fadeUp 0.7s ease 0.1s both;
+    }
+    .hero h1 .hl { color: var(--accent); }
+    .hero h1 .hl2 { color: var(--accent2); }
+    .hero-sub {
+      margin-top: 1.5rem; max-width: 560px;
+      color: var(--muted); font-size: 0.9rem; line-height: 1.8;
+      animation: fadeUp 0.7s ease 0.2s both;
+    }
+    .hero-cta {
+      margin-top: 2.5rem; display: flex; gap: 1rem; flex-wrap: wrap;
+      animation: fadeUp 0.7s ease 0.3s both;
+    }
+    .btn {
+      display: inline-block; padding: 0.8rem 2rem;
+      font-family: var(--font-mono); font-size: 0.8rem;
+      letter-spacing: 1px; text-transform: uppercase;
+      text-decoration: none; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent); color: var(--bg);
+      border: 2px solid var(--accent); font-weight: 700;
+    }
+    .btn-primary:hover { background: transparent; color: var(--accent); }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 2px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Waveform SVG decoration */
+    .hero-wave {
+      position: absolute; right: -40px; top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.15; width: 55%; pointer-events: none;
+      animation: pulse 4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.12;} 50%{opacity:0.22;} }
+
+    /* ── SECTION COMMONS ── */
+    section { position: relative; z-index: 1; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 5rem 3rem; }
+    .section-label {
+      font-size: 0.65rem; letter-spacing: 5px; text-transform: uppercase;
+      color: var(--accent2); margin-bottom: 0.8rem;
+    }
+    .section-title {
+      font-family: var(--font-head); font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 800; letter-spacing: -1px; margin-bottom: 1rem;
+    }
+    .section-desc { color: var(--muted); max-width: 600px; font-size: 0.9rem; line-height: 1.8; }
+
+    /* ── OBJECTIVE ── */
+    .objective-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+      margin-top: 3rem; border: 2px solid var(--border);
+    }
+    .obj-card {
+      background: var(--card); padding: 2.5rem;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .obj-card:hover { background: #0f1e35; }
+    .obj-card:nth-child(2n) { border-right: none; }
+    .obj-num {
+      font-size: 0.65rem; letter-spacing: 3px; color: var(--accent);
+      text-transform: uppercase; margin-bottom: 1rem;
+    }
+    .obj-card h3 {
+      font-family: var(--font-head); font-size: 1.2rem; font-weight: 700;
+      margin-bottom: 0.8rem;
+    }
+    .obj-card p { color: var(--muted); font-size: 0.82rem; line-height: 1.7; }
+
+    /* ── SIGNAL / DATA ── */
+    .signal-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .signal-eq {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 2rem 2.5rem; margin: 2.5rem 0;
+      font-size: 1.1rem; letter-spacing: 1px;
+      color: var(--accent3); text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .signal-eq::before {
+      content: 'MULTIVARIATE SIGNAL';
+      position: absolute; top: 0.5rem; left: 1rem;
+      font-size: 0.6rem; letter-spacing: 3px; color: var(--muted);
+    }
+
+    .vars-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-top: 2rem;
+    }
+    .var-card {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 1.5rem 1rem; text-align: center;
+      transition: all 0.2s; cursor: default;
+    }
+    .var-card:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .var-sym {
+      font-family: var(--font-head); font-size: 2rem; font-weight: 800;
+      color: var(--accent); display: block; margin-bottom: 0.5rem;
+    }
+    .var-label { font-size: 0.7rem; color: var(--muted); letter-spacing: 1px; }
+    .var-full { font-size: 0.75rem; color: var(--text); margin-top: 0.3rem; }
+
+    /* ── PIPELINE ── */
+    .pipeline-steps {
+      display: flex; align-items: stretch; margin-top: 3rem;
+      gap: 0;
+    }
+    .pipe-step {
+      flex: 1; background: var(--card);
+      border: 1px solid var(--border); padding: 2rem 1.5rem;
+      position: relative; transition: background 0.2s;
+    }
+    .pipe-step:not(:last-child)::after {
+      content: '→';
+      position: absolute; right: -18px; top: 50%; transform: translateY(-50%);
+      color: var(--accent); font-size: 1.2rem; z-index: 2;
+      background: var(--bg); padding: 0.2rem;
+    }
+    .pipe-step:hover { background: #0f1e35; }
+    .pipe-num { font-size: 2rem; font-weight: 800; color: var(--border); font-family: var(--font-head); }
+    .pipe-title { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin: 0.5rem 0; color: var(--accent); }
+    .pipe-desc { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── STFT ── */
+    .stft-section { background: var(--bg); }
+
+    .stft-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 3rem; margin-top: 3rem; align-items: start; }
+
+    .formula-block {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 2rem; margin-bottom: 1.5rem;
+    }
+    .formula-title {
+      font-size: 0.65rem; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--accent2); margin-bottom: 1rem;
+    }
+    .formula {
+      font-size: 1rem; color: var(--accent3); line-height: 2;
+      font-family: var(--font-mono); word-break: break-all;
+    }
+    .formula sub { font-size: 0.7em; }
+
+    .params-list { list-style: none; }
+    .params-list li {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 0.8rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .params-list li:last-child { border-bottom: none; }
+    .param-key { color: var(--accent); min-width: 80px; font-weight: 700; }
+    .param-val { color: var(--muted); }
+
+    /* Animated spectrogram canvas */
+    .spectrogram-demo {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 1.5rem;
+    }
+    .spec-label { font-size: 0.65rem; letter-spacing: 3px; color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; }
+    canvas#specCanvas { display: block; width: 100%; image-rendering: pixelated; border: 1px solid var(--border); }
+
+    /* trade-off cards */
+    .tradeoff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+    .tradeoff-card {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 1.2rem; font-size: 0.8rem;
+    }
+    .tradeoff-card strong { display: block; color: var(--accent2); font-family: var(--font-head); font-size: 1rem; margin-bottom: 0.3rem; }
+
+    /* ── TASKS ── */
+    .tasks-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .tasks-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 3rem; }
+    .task-card {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 2rem; position: relative; overflow: hidden;
+      transition: all 0.25s;
+    }
+    .task-card:hover { border-color: var(--accent); }
+    .task-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .task-card:nth-child(1)::before { background: var(--accent); }
+    .task-card:nth-child(2)::before { background: var(--accent2); }
+    .task-card:nth-child(3)::before { background: var(--accent3); }
+    .task-card:nth-child(4)::before { background: #c77dff; }
+    .task-num {
+      font-family: var(--font-head); font-size: 4rem; font-weight: 800;
+      color: var(--border); position: absolute; top: 0.5rem; right: 1rem;
+      line-height: 1;
+    }
+    .task-card h3 {
+      font-family: var(--font-head); font-size: 1.2rem; font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .task-card ul { list-style: none; }
+    .task-card ul li {
+      font-size: 0.8rem; color: var(--muted); padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;
+    }
+    .task-card ul li:last-child { border-bottom: none; }
+    .task-card ul li::before { content: '▸'; color: var(--accent); font-size: 0.7rem; }
+
+    /* ── CNN MODEL ── */
+    .cnn-section { background: var(--bg); }
+    .cnn-arch {
+      margin-top: 3rem; background: var(--card); border: 1px solid var(--border);
+      padding: 2.5rem; overflow-x: auto;
+    }
+    .cnn-layers { display: flex; gap: 1rem; align-items: center; min-width: 800px; flex-wrap: wrap; }
+    .cnn-layer {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .layer-box {
+      padding: 0.8rem 1.2rem; font-size: 0.7rem; text-align: center;
+      letter-spacing: 1px; font-weight: 700; border: 2px solid;
+      min-width: 90px; line-height: 1.4;
+    }
+    .layer-box.input { border-color: var(--accent); color: var(--accent); }
+    .layer-box.conv { border-color: var(--accent2); color: var(--accent2); }
+    .layer-box.pool { border-color: #c77dff; color: #c77dff; }
+    .layer-box.fc { border-color: var(--accent3); color: var(--accent3); }
+    .layer-box.out { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.1); }
+    .layer-arrow { color: var(--muted); font-size: 1.2rem; }
+    .layer-label { font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; text-align: center; }
+
+    .cnn-eq {
+      margin-top: 2rem; text-align: center;
+      font-size: 1.1rem; color: var(--accent3); padding: 1.5rem;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+
+    /* ── DATA SOURCES ── */
+    .sources-section { background: var(--surface); border-top: 1px solid var(--border); }
+    .sources-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3rem; }
+    .source-card {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 1.8rem; transition: all 0.2s;
+    }
+    .source-card:hover { border-color: var(--accent2); transform: translateY(-4px); }
+    .source-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .source-card h4 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .source-card a { color: var(--accent); font-size: 0.7rem; word-break: break-all; text-decoration: none; }
+    .source-card a:hover { text-decoration: underline; }
+    .source-card p { color: var(--muted); font-size: 0.78rem; margin-top: 0.5rem; line-height: 1.5; }
+
+    /* ── OUTCOME ── */
+    .outcome-section { background: var(--bg); }
+    .outcome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3rem; }
+    .outcome-card {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 2rem; text-align: center; transition: all 0.2s;
+    }
+    .outcome-card:hover { border-color: var(--accent3); }
+    .outcome-icon { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
+    .outcome-card h4 { font-family: var(--font-head); font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .outcome-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── REFERENCES ── */
+    .refs-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .refs-list { margin-top: 2rem; }
+    .ref-item {
+      display: flex; gap: 1.5rem; align-items: flex-start;
+      padding: 1.2rem 0; border-bottom: 1px solid var(--border);
+    }
+    .ref-num { color: var(--accent); font-size: 1.2rem; font-weight: 700; min-width: 2rem; }
+    .ref-item p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    .ref-item strong { color: var(--text); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--bg); border-top: 1px solid var(--border);
+      padding: 2rem 3rem; text-align: center;
+      font-size: 0.75rem; color: var(--muted); position: relative; z-index: 1;
+    }
+    footer span { color: var(--accent); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    .reveal {
+      opacity: 0; transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      nav { padding: 1rem 1.5rem; }
+      .nav-links { display: none; }
+      .hero { padding: 7rem 1.5rem 3rem; }
+      .container { padding: 3rem 1.5rem; }
+      .objective-grid, .stft-grid, .tasks-grid, .outcome-grid, .sources-grid { grid-template-columns: 1fr; }
+      .vars-grid { grid-template-columns: repeat(3, 1fr); }
+      .pipeline-steps { flex-direction: column; }
+      .pipe-step:not(:last-child)::after { content: '↓'; right: 50%; top: auto; bottom: -18px; transform: translateX(50%); }
+      .cnn-layers { flex-direction: column; min-width: unset; }
+      .layer-arrow { transform: rotate(90deg); }
+      .hero-wave { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Fin<span>Signal</span></div>
+  <div class="nav-links">
+    <a href="#objective">Objective</a>
+    <a href="#signal">Signal</a>
+    <a href="#stft">STFT</a>
+    <a href="#tasks">Tasks</a>
+    <a href="#model">Model</a>
+    <a href="#sources">Data</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-tag">Assignment II — Pattern Recognition</div>
+  <h1>Financial Time Series<br/><span class="hl">Forecasting</span> via<br/><span class="hl2">Deep Learning</span></h1>
+  <p class="hero-sub">
+    Combining time–frequency signal processing with convolutional neural networks to predict stock prices from multivariate financial data.
+  </p>
+  <div class="hero-cta">
+    <a href="#objective" class="btn btn-primary">Explore Assignment</a>
+    <a href="#tasks" class="btn btn-outline">View Tasks</a>
+  </div>
+
+  <!-- Animated waveform SVG -->
+  <svg class="hero-wave" viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+    <polyline id="wavePolyline" fill="none" stroke="#00e5ff" stroke-width="2"/>
+    <polyline id="wavePolyline2" fill="none" stroke="#ff6b35" stroke-width="1.5"/>
+  </svg>
+</section>
+
+<!-- OBJECTIVE -->
+<section id="objective">
+  <div class="container">
+    <p class="section-label reveal">/ Overview</p>
+    <h2 class="section-title reveal">Objective</h2>
+    <p class="section-desc reveal">Explore how time–frequency signal processing and deep learning can be combined to predict stock prices using financial time series data.</p>
+    <div class="objective-grid reveal">
+      <div class="obj-card">
+        <p class="obj-num">01 / Collect</p>
+        <h3>Data Acquisition</h3>
+        <p>Gather financial time series from at least 3 companies — stock prices, revenue, profit, market indices, and exchange rates.</p>
+      </div>
+      <div class="obj-card">
+        <p class="obj-num">02 / Transform</p>
+        <h3>Signal Processing</h3>
+        <p>Apply Fourier Transform and STFT to convert raw time series into time–frequency spectrograms.</p>
+      </div>
+      <div class="obj-card">
+        <p class="obj-num">03 / Model</p>
+        <h3>CNN Development</h3>
+        <p>Design and train a CNN regression model using spectrograms to predict future stock prices.</p>
+      </div>
+      <div class="obj-card">
+        <p class="obj-num">04 / Evaluate</p>
+        <h3>Analysis & Results</h3>
+        <p>Compare predictions with actual values using MSE, and analyze how different features affect performance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SIGNAL REPRESENTATION -->
+<section class="signal-section" id="signal">
+  <div class="container">
+    <p class="section-label reveal">/ Problem Description</p>
+    <h2 class="section-title reveal">Multivariate Signal</h2>
+    <p class="section-desc reveal">Financial data is treated as a multivariate signal combining multiple economic indicators across time.</p>
+
+    <div class="signal-eq reveal">
+      X(t) = [ p(t),&nbsp; r(t),&nbsp; g(t),&nbsp; s(t),&nbsp; d(t) ]
+    </div>
+
+    <div class="vars-grid reveal">
+      <div class="var-card">
+        <span class="var-sym">p(t)</span>
+        <div class="var-label">Variable</div>
+        <div class="var-full">Stock Price vs Time</div>
+      </div>
+      <div class="var-card">
+        <span class="var-sym">r(t)</span>
+        <div class="var-label">Variable</div>
+        <div class="var-full">Revenue vs Quarter</div>
+      </div>
+      <div class="var-card">
+        <span class="var-sym">g(t)</span>
+        <div class="var-label">Variable</div>
+        <div class="var-full">Profit vs Quarter</div>
+      </div>
+      <div class="var-card">
+        <span class="var-sym">s(t)</span>
+        <div class="var-label">Variable</div>
+        <div class="var-full">Market Index (Sensex)</div>
+      </div>
+      <div class="var-card">
+        <span class="var-sym">d(t)</span>
+        <div class="var-label">Variable</div>
+        <div class="var-full">USD–INR Exchange Rate</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PIPELINE -->
+<section id="pipeline">
+  <div class="container">
+    <p class="section-label reveal">/ System Design</p>
+    <h2 class="section-title reveal">Processing Pipeline</h2>
+    <div class="pipeline-steps reveal">
+      <div class="pipe-step">
+        <div class="pipe-num">01</div>
+        <div class="pipe-title">Time Series Data</div>
+        <div class="pipe-desc">Raw financial data collected from NSE, BSE, Yahoo Finance and RBI</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">02</div>
+        <div class="pipe-title">STFT Transform</div>
+        <div class="pipe-desc">Apply sliding window STFT to convert time domain signal to frequency domain</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">03</div>
+        <div class="pipe-title">Spectrogram</div>
+        <div class="pipe-desc">Generate 2D time–frequency representation S(t,f) as input image</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">04</div>
+        <div class="pipe-title">CNN Model</div>
+        <div class="pipe-desc">Convolutional neural network learns patterns in the spectrogram</div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num">05</div>
+        <div class="pipe-title">Prediction</div>
+        <div class="pipe-desc">Output: predicted stock price p̂(t + Δt)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STFT SECTION -->
+<section class="stft-section" id="stft">
+  <div class="container">
+    <p class="section-label reveal">/ Methodology</p>
+    <h2 class="section-title reveal">Short-Time Fourier Transform</h2>
+    <p class="section-desc reveal">Financial time series are non-stationary — their statistical properties change over time. STFT captures both time and frequency information simultaneously.</p>
+
+    <div class="stft-grid reveal">
+      <div>
+        <div class="formula-block">
+          <div class="formula-title">STFT Definition</div>
+          <div class="formula">STFT(t, f) = ∫ X(τ) · w(τ−t) · e<sup>−j2πfτ</sup> dτ</div>
+        </div>
+        <div class="formula-block">
+          <div class="formula-title">Spectrogram (Energy)</div>
+          <div class="formula">S(t, f) = | STFT(t, f) |²</div>
+        </div>
+
+        <div class="formula-block">
+          <div class="formula-title">Sliding Window Segments</div>
+          <div class="formula" style="font-size:0.85rem; line-height:2.2;">
+            X<sub>1:L</sub>, X<sub>1+H:L+H</sub>, X<sub>1+2H:L+2H</sub>, ...
+          </div>
+        </div>
+
+        <ul class="params-list">
+          <li><span class="param-key">L</span><span class="param-val">Window Length — number of samples per segment</span></li>
+          <li><span class="param-key">H</span><span class="param-val">Hop Size — step by which the window shifts</span></li>
+          <li><span class="param-key">L − H</span><span class="param-val">Overlap between consecutive windows</span></li>
+          <li><span class="param-key">S ∈ ℝ<sup>T×F</sup></span><span class="param-val">Spectrogram treated as a 2D image</span></li>
+        </ul>
+
+        <div class="tradeoff-grid">
+          <div class="tradeoff-card"><strong>↑ Larger Window</strong>Better frequency resolution, weaker time resolution</div>
+          <div class="tradeoff-card"><strong>↓ Smaller Window</strong>Better time resolution, weaker frequency resolution</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="spectrogram-demo">
+          <div class="spec-label">Live Spectrogram Simulation</div>
+          <canvas id="specCanvas" width="340" height="220"></canvas>
+          <div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--muted);margin-top:0.5rem;">
+            <span>← Time →</span><span>↑ Frequency ↑</span>
+          </div>
+        </div>
+
+        <div style="margin-top:1.5rem; background:var(--card); border:1px solid var(--border); padding:1.5rem;">
+          <div class="formula-title" style="margin-bottom:1rem;">Spectrogram Interpretation</div>
+          <ul class="params-list">
+            <li><span class="param-key" style="color:#ff6b35;">Low Freq</span><span class="param-val">Long-term trends in financial data</span></li>
+            <li><span class="param-key" style="color:#7fff6f;">High Freq</span><span class="param-val">Short-term fluctuations & volatility</span></li>
+            <li><span class="param-key">Intensity</span><span class="param-val">Signal energy at (time, frequency)</span></li>
+            <li><span class="param-key">Format</span><span class="param-val">Treated as a 2D image for CNN input</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TASKS -->
+<section class="tasks-section" id="tasks">
+  <div class="container">
+    <p class="section-label reveal">/ Assignment Tasks</p>
+    <h2 class="section-title reveal">Four Core Tasks</h2>
+    <p class="section-desc reveal">Students must complete all four tasks and include the required figures in their final submission.</p>
+    <div class="tasks-grid reveal">
+      <div class="task-card">
+        <div class="task-num">01</div>
+        <h3>Data Preparation</h3>
+        <ul>
+          <li>Collect time series data for at least 3 companies</li>
+          <li>Align all variables to a common time scale</li>
+          <li>Normalize the data for model input</li>
+        </ul>
+      </div>
+      <div class="task-card">
+        <div class="task-num">02</div>
+        <h3>Signal Processing</h3>
+        <ul>
+          <li>Apply Fourier Transform to raw data</li>
+          <li>Generate spectrograms using STFT</li>
+          <li>Visualize spectrograms for analysis</li>
+        </ul>
+      </div>
+      <div class="task-card">
+        <div class="task-num">03</div>
+        <h3>Model Development</h3>
+        <ul>
+          <li>Design a CNN regression model</li>
+          <li>Train on spectrogram image data</li>
+          <li>Predict future stock prices</li>
+        </ul>
+      </div>
+      <div class="task-card">
+        <div class="task-num">04</div>
+        <h3>Analysis</h3>
+        <ul>
+          <li>Compare predictions with actual values</li>
+          <li>Evaluate performance using MSE</li>
+          <li>Analyze effect of different features</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:2rem; background:var(--card); border:1px solid var(--border); padding:2rem;" class="reveal">
+      <div class="formula-title" style="margin-bottom:1rem;">Required Figures in Submission</div>
+      <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:1rem;">
+        <div style="text-align:center; padding:1rem; border:1px solid var(--border);">
+          <div style="font-size:1.5rem; margin-bottom:0.5rem;">📈</div>
+          <div style="font-size:0.75rem; color:var(--muted);">Time Series Plot</div>
+        </div>
+        <div style="text-align:center; padding:1rem; border:1px solid var(--border);">
+          <div style="font-size:1.5rem; margin-bottom:0.5rem;">📊</div>
+          <div style="font-size:0.75rem; color:var(--muted);">Frequency Spectrum</div>
+        </div>
+        <div style="text-align:center; padding:1rem; border:1px solid var(--border);">
+          <div style="font-size:1.5rem; margin-bottom:0.5rem;">🌈</div>
+          <div style="font-size:0.75rem; color:var(--muted);">Spectrogram</div>
+        </div>
+        <div style="text-align:center; padding:1rem; border:1px solid var(--border);">
+          <div style="font-size:1.5rem; margin-bottom:0.5rem;">🧠</div>
+          <div style="font-size:0.75rem; color:var(--muted);">CNN Architecture</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CNN MODEL -->
+<section class="cnn-section" id="model">
+  <div class="container">
+    <p class="section-label reveal">/ Prediction Model</p>
+    <h2 class="section-title reveal">CNN Architecture</h2>
+    <p class="section-desc reveal">The CNN model takes a spectrogram as input and outputs the predicted stock price for a future time step.</p>
+
+    <div class="cnn-arch reveal">
+      <div class="cnn-layers">
+        <div class="cnn-layer">
+          <div class="layer-box input">INPUT<br/>Spectrogram<br/>S(t,f)</div>
+          <div class="layer-label">T × F × 1</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box conv">CONV2D<br/>+ ReLU</div>
+          <div class="layer-label">32 filters</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box pool">MAX<br/>POOL</div>
+          <div class="layer-label">2×2</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box conv">CONV2D<br/>+ ReLU</div>
+          <div class="layer-label">64 filters</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box pool">MAX<br/>POOL</div>
+          <div class="layer-label">2×2</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box fc">FLATTEN<br/>→ FC</div>
+          <div class="layer-label">Dense 128</div>
+        </div>
+        <div class="layer-arrow">→</div>
+        <div class="cnn-layer">
+          <div class="layer-box out">OUTPUT<br/>p̂(t+Δt)</div>
+          <div class="layer-label">1 neuron</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cnn-eq reveal">
+      p̂(t + Δt) = f<sub>θ</sub>(S<sub>t</sub>)
+      <div style="font-size:0.7rem; color:var(--muted); margin-top:0.5rem;">
+        where f<sub>θ</sub> is the CNN model with parameters θ, and S<sub>t</sub> is the spectrogram at time t
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA SOURCES -->
+<section class="sources-section" id="sources">
+  <div class="container">
+    <p class="section-label reveal">/ Data Sources</p>
+    <h2 class="section-title reveal">Where to Get Data</h2>
+    <div class="sources-grid reveal">
+      <div class="source-card">
+        <div class="source-icon">📉</div>
+        <h4>Yahoo Finance</h4>
+        <a href="https://finance.yahoo.com" target="_blank">finance.yahoo.com</a>
+        <p>Global stock data, historical prices, financial statements</p>
+      </div>
+      <div class="source-card">
+        <div class="source-icon">🇮🇳</div>
+        <h4>NSE India</h4>
+        <a href="https://www.nseindia.com" target="_blank">nseindia.com</a>
+        <p>National Stock Exchange — Indian equity market data</p>
+      </div>
+      <div class="source-card">
+        <div class="source-icon">📋</div>
+        <h4>BSE India</h4>
+        <a href="https://www.bseindia.com" target="_blank">bseindia.com</a>
+        <p>Bombay Stock Exchange — Sensex and equity data</p>
+      </div>
+      <div class="source-card">
+        <div class="source-icon">🏦</div>
+        <h4>RBI Database</h4>
+        <a href="https://www.rbi.org.in" target="_blank">rbi.org.in</a>
+        <p>USD–INR exchange rates, macro-economic indicators</p>
+      </div>
+      <div class="source-card">
+        <div class="source-icon">🤖</div>
+        <h4>Kaggle</h4>
+        <a href="https://www.kaggle.com" target="_blank">kaggle.com</a>
+        <p>Ready-to-use financial datasets, notebooks, and competitions</p>
+      </div>
+      <div class="source-card" style="border-style: dashed; opacity: 0.6;">
+        <div class="source-icon">➕</div>
+        <h4>Other Sources</h4>
+        <a href="#">Quandl, Alpha Vantage, FRED</a>
+        <p>Additional open financial data APIs and databases</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXPECTED OUTCOME -->
+<section class="outcome-section" id="outcome">
+  <div class="container">
+    <p class="section-label reveal">/ Expected Outcome</p>
+    <h2 class="section-title reveal">What You'll Demonstrate</h2>
+    <div class="outcome-grid reveal">
+      <div class="outcome-card">
+        <span class="outcome-icon">📡</span>
+        <h4>Signal Analysis</h4>
+        <p>Financial time series can be treated and analyzed as signals in both time and frequency domains.</p>
+      </div>
+      <div class="outcome-card">
+        <span class="outcome-icon">🌊</span>
+        <h4>Hidden Patterns</h4>
+        <p>Spectrograms reveal frequency-based patterns in financial data that are not visible in raw time series.</p>
+      </div>
+      <div class="outcome-card">
+        <span class="outcome-icon">🧠</span>
+        <h4>CNN Prediction</h4>
+        <p>CNN models can learn useful representations from spectrograms for accurate stock price prediction.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REFERENCES -->
+<section class="refs-section" id="refs">
+  <div class="container">
+    <p class="section-label reveal">/ Bibliography</p>
+    <h2 class="section-title reveal">References</h2>
+    <div class="refs-list reveal">
+      <div class="ref-item">
+        <div class="ref-num">[1]</div>
+        <p><strong>Y. Zhang and C. Aggarwal</strong> — "Stock Market Prediction Using Deep Learning," <em>IEEE Access.</em></p>
+      </div>
+      <div class="ref-item">
+        <div class="ref-num">[2]</div>
+        <p><strong>A. Tsantekidis et al.</strong> — "Deep Learning for Financial Time Series Forecasting."</p>
+      </div>
+      <div class="ref-item">
+        <div class="ref-num">[3]</div>
+        <p><strong>S. Hochreiter and J. Schmidhuber</strong> — "Long Short-Term Memory," <em>Neural Computation,</em> 1997.</p>
+      </div>
+      <div class="ref-item">
+        <div class="ref-num">[4]</div>
+        <p><strong>A. Borovykh et al.</strong> — "Conditional Time Series Forecasting with CNNs."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span>FinSignal</span> — Pattern Recognition for Financial Time Series Forecasting &nbsp;|&nbsp; Second Assignment
+</footer>
+
+<script>
+  /* ── WAVEFORM ANIMATION ── */
+  function drawWave() {
+    const poly1 = document.getElementById('wavePolyline');
+    const poly2 = document.getElementById('wavePolyline2');
+    if (!poly1) return;
+    let t = 0;
+    function frame() {
+      t += 0.04;
+      let pts1 = '', pts2 = '';
+      for (let x = 0; x <= 700; x += 4) {
+        const y = 200 + 80 * Math.sin(x * 0.015 + t) * Math.sin(x * 0.005 - t * 0.5) + 30 * Math.sin(x * 0.05 + t * 2);
+        const y2 = 200 + 60 * Math.cos(x * 0.012 + t * 1.3) * Math.sin(x * 0.008 + t * 0.3);
+        pts1 += `${x},${y} `;
+        pts2 += `${x},${y2} `;
+      }
+      poly1.setAttribute('points', pts1);
+      poly2.setAttribute('points', pts2);
+      requestAnimationFrame(frame);
+    }
+    frame();
+  }
+  drawWave();
+
+  /* ── SPECTROGRAM SIMULATION ── */
+  const canvas = document.getElementById('specCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let col = 0, specT = 0;
+
+  function drawSpecColumn() {
+    specT += 0.07;
+    ctx.fillStyle = 'rgba(8, 15, 30, 0.08)';
+    ctx.fillRect(0, 0, W, H);
+
+    const x = col % W;
+    ctx.clearRect(x, 0, 2, H);
+    ctx.fillStyle = '#040810';
+    ctx.fillRect(x, 0, 2, H);
+
+    for (let y = 0; y < H; y++) {
+      const freq = (H - y) / H;
+      const energy =
+        0.6 * Math.abs(Math.sin(specT * (1 + freq * 3) + freq * 5)) +
+        0.3 * Math.abs(Math.sin(specT * 0.5 + freq * 10)) +
+        (Math.random() * 0.1);
+      const clampedE = Math.min(1, energy);
+      const r = Math.floor(clampedE * 255 * (freq < 0.3 ? 0.5 : 1));
+      const g = Math.floor(clampedE * 200 * (freq > 0.4 ? 1 : 0.4));
+      const b = Math.floor((1 - clampedE) * 100 + clampedE * 50);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(x, y, 2, 1);
+    }
+    col++;
+    setTimeout(drawSpecColumn, 30);
+  }
+  drawSpecColumn();
+
+  /* ── SCROLL REVEAL ── */
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
