@@ -4,6 +4,8 @@
 > Department of Computer Science & Engineering
 
 ---
+## LIVE DEMO
+Click here to access the live demo - https://financialtimeseries.netlify.app/
 
 ## 👥 Team Members
 
